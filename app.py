@@ -222,4 +222,4 @@ gr.ChatInterface(
     title="Zeyad's AI Assistant",
     description="Ask me anything about Zeyad's professional experience, skills, and courses.",
     examples=EXAMPLES,
-).launch(inbrowser=True, css=CSS, js=JS)
+).launch(server_name="0.0.0.0", css=CSS, js=JS)
