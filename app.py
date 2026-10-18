@@ -56,8 +56,8 @@ print("Done! Reading all files and connect to openai be successfully ")
 # The 'f' prefix before the quotation marks allows you to embed variables directly into the text.
 system_prompt = f"""
 # Your Role
-You are the digital twin and intelligent agent for Zeyad, an engineer specializing in Cloud Engineering and DevOps.
-Your task is to interact with HR representatives or technical managers who visit this application, answering their questions regarding Zeyad’s professional career, skills, and projects.
+You are the professional advocate and intelligent agent for Zeyad, a highly skilled Cloud Engineering and DevOps engineer.
+Your primary goal is to impress HR representatives and technical hiring managers who visit this application, effectively "selling" Zeyad as the ideal candidate for advanced DevOps and Cloud roles.
 If asked who you are, clearly state that you are an AI assistant programmed by Zeyad to represent him.
 
 # Available Information (Context)
@@ -68,14 +68,18 @@ And here are the details of the courses he has completed:
 {Devops_Course_RoadMap}
 {azure_courses}
 {DevopsProjects}
+
 # Rules
-1. Be professional, polite, and concise in your responses. Speak on Zeyad’s behalf using the third person (e.g., "Zeyad has experience in...").
-2. Use only the information provided in the resume and the list of courses.
-3. Very important: If a user asks about something not covered in the provided information, politely apologize, state that you do not have that information, and suggest that they contact Zeyad directly.
-4. Do not invent or fabricate any experiences, skills, or technologies that are not mentioned above.
-5. Avoid answering any questions that fall outside the professional and technical scope.
-If the user would like to get in touch, ask for their email, and use your tool to record their details.
-IMPORTANT: If you don't know the answer, use your tool to record the question, and then tell the user that you don't know. Never make up an answer.
+1. NEVER copy and paste text directly from the context. You must always rephrase, synthesize, and explain the information in a persuasive, professional manner.
+2. Focus on IMPACT and VALUE. When a user asks about a project or a skill, don't just list it. Explain *how* Zeyad used it to solve real-world problems and *why* it makes him a strong engineering asset.
+3. Be professional, engaging, and confident. Speak on Zeyad’s behalf using the third person (e.g., "Zeyad has strong expertise in...").
+4. Use ONLY the facts provided in the context, but use your AI reasoning to explain those facts eloquently. Do not fabricate new experiences.
+5. Tailor your answers to appeal to HR and Tech Leads. Highlight his problem-solving mindset, continuous learning (Azure certifications, etc.), and practical project experience.
+6. Very important: If a user asks about something not covered in the provided information, politely apologize, state that you do not have that information, and suggest that they contact Zeyad directly.
+7. Avoid answering any questions that fall outside the professional and technical scope.
+
+IMPORTANT: If you don't know the answer, use your tool to record the question, and then tell the user that you don't know. Never make up an answer. If the user would like to get in touch, ask for their email, and use your tool to record their details.
+If a user asks a complex question or requests a multi-step action, ALWAYS use your 'create_checklist' tool to plan the steps first, then execute them, and mark them complete using 'mark_complete'.
 """
 
 # A line to confirm that the prompt is ready
@@ -145,11 +149,80 @@ record_unknown_question_json = {
         "additionalProperties": False
     }
 }
+checklist = []
+completed = []
 
+def get_checklist_report() -> str:
+    result = "Here is the current task checklist:\n\n"
+    for index, item in enumerate(checklist):
+        if completed[index]:
+            result += f"✅ **Task #{index + 1}:** ~{item}~\n"
+        else:
+            result += f"🔲 **Task #{index + 1}:** {item}\n"
+    return result
+
+def create_checklist(descriptions: list[str]) -> str:
+    global checklist, completed
+    checklist.extend(descriptions)
+    completed.extend([False] * len(descriptions))
+    return get_checklist_report()
+
+def mark_complete(index: int, completion_notes: str) -> str:
+    global completed
+    if 1 <= index <= len(checklist):
+        completed[index - 1] = True
+    else:
+        return "No checklist at this index."
+    
+    # يمكننا أيضاً إرسال إشعار لك عبر Pushover عند اكتمال مهمة!
+    push(f"Agent Task Completed: Task #{index} - Notes: {completion_notes}")
+    
+    return get_checklist_report()
+
+# --- Checklist JSON Schemas ---
+
+create_checklist_json = {
+    "name": "create_checklist",
+    "description": "Add new checklist from a list of descriptions and return the full list. Use this when you need to plan a multi-step task.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "descriptions": {
+                'type': 'array',
+                'items': {'type': 'string'},
+                'description': 'Descriptions of checklist items'
+                }
+            },
+        "required": ["descriptions"],
+        "additionalProperties": False
+    }
+}
+
+mark_complete_json = {
+    "name": "mark_complete",
+    "description": "Mark complete the checklist item at the given position (starting from 1) and return the full list. Use this after successfully executing a task.",
+    "parameters": {
+        'type': 'object',
+        'properties': {
+            'index': {
+                'description': 'The 1-based index of the checklist item to mark as complete',
+                'type': 'integer'
+                },
+            'completion_notes': {
+                'description': 'Notes about how you completed the checklist item',
+                'type': 'string'
+                }
+            },
+        'required': ['index', 'completion_notes'],
+        'additionalProperties': False
+    }
+}
 tools = [
     {"type": "function", "function": record_user_details_json},
     {"type": "function", "function": record_unknown_question_json},
     {"type": "function", "function": record_hr_email_tool_json},
+    {"type": "function", "function": create_checklist_json}, # أداة إنشاء القائمة
+    {"type": "function", "function": mark_complete_json},    # أداة إكمال المهمة
 ]
 
 print("Tools defined successfully!")
@@ -222,4 +295,6 @@ gr.ChatInterface(
     title="Zeyad's AI Assistant",
     description="Ask me anything about Zeyad's professional experience, skills, and courses.",
     examples=EXAMPLES,
-).launch(server_name="0.0.0.0", css=CSS, js=JS)
+).launch(inbrowser=True, css=CSS, js=JS)
+
+#cloudflared tunnel --url http://127.0.0.1:7860
